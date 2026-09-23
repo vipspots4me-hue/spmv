@@ -1,13 +1,42 @@
 import logging
 import os
 import time
-os.system("yes | spotdl --download-ffmpeg")
+
 from dotenv import dotenv_values
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# =========================================================
+# Logging
+# =========================================================
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
 logger = logging.getLogger(__name__)
+
+
+# =========================================================
+# Paths
+# =========================================================
+
+PYTHON_VENV = "/home/adminuser/venv"
+SPOTDL = f"{PYTHON_VENV}/bin/spotdl"
+
+
+# =========================================================
+# Download FFmpeg
+# =========================================================
+
+os.system(f'yes | {SPOTDL} --download-ffmpeg')
+
+
+# =========================================================
+# Config
+# =========================================================
 
 class Config:
     def __init__(self):
@@ -18,110 +47,346 @@ class Config:
             token = dotenv_values(".env")["TELEGRAM_TOKEN"]
         except Exception as e:
             logger.error(f"Failed to load token from .env file: {e}")
-            token = os.environ.get('TELEGRAM_TOKEN')
+
+            token = os.environ.get("TELEGRAM_TOKEN")
+
             if token is None:
-                logger.error("Telegram token not found. Make sure to set TELEGRAM_TOKEN environment variable.")
+                logger.error(
+                    "Telegram token not found. "
+                    "Make sure to set TELEGRAM_TOKEN environment variable."
+                )
                 raise ValueError("Telegram token not found.")
+
         self.token = token
-        self.auth_enabled = False  # Change to True if authentication is required
-        self.auth_password = "spot@o"  # Set the desired authentication password
-        self.auth_users = []  # List of authorized user chat IDs
+
+        self.auth_enabled = False
+        self.auth_password = "spot@o"
+        self.auth_users = []
+
 
 config = Config()
 
+
+# =========================================================
+# Authentication
+# =========================================================
+
 def authenticate_user(update: Update, context: CallbackContext):
+
     chat_id = update.effective_chat.id
     text = update.effective_message.text.strip()
 
     if chat_id not in config.auth_users:
+
         if text.startswith("/password "):
+
             provided_password = text.split(" ", 1)[1]
+
             if provided_password == config.auth_password:
+
                 config.auth_users.append(chat_id)
-                context.bot.send_message(chat_id=chat_id, text="✅ Authentication successful! You can now use the bot.")
+
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text="✅ Authentication successful! You can now use the bot."
+                )
+
             else:
-                context.bot.send_message(chat_id=chat_id, text="⚠️ Incorrect password. Please try again.")
+
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ Incorrect password. Please try again."
+                )
+
         else:
-            context.bot.send_message(chat_id=chat_id, text="⚠️ You need to authenticate first. Use /password <your_password>.")
+
+            context.bot.send_message(
+                chat_id=chat_id,
+                text="⚠️ You need to authenticate first. "
+                     "Use /password <your_password>."
+            )
+
         return False
+
     return True
 
+
 def authenticate(func):
+
     def wrapper(update: Update, context: CallbackContext):
+
         chat_id = update.effective_chat.id
+
         if config.auth_enabled:
+
             if chat_id not in config.auth_users:
-                context.bot.send_message(chat_id=chat_id, text="⚠️ The password was incorrect")
+
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ The password was incorrect"
+                )
+
                 return
+
         return func(update, context)
+
     return wrapper
 
+
+# =========================================================
+# Start command
+# =========================================================
+
 def start(update: Update, context: CallbackContext):
+
     chat_id = update.effective_chat.id
-    context.bot.send_message(chat_id=chat_id, text="🎵 Welcome to the Song Downloader Bot! 🎵")
+
+    context.bot.send_message(
+        chat_id=chat_id,
+        text="🎵 Welcome to the Song Downloader Bot! 🎵"
+    )
+
+
+# =========================================================
+# Download song
+# =========================================================
 
 def get_single_song(update: Update, context: CallbackContext):
+
     if not authenticate_user(update, context):
         return
 
     chat_id = update.effective_chat.id
     message_id = update.effective_message.message_id
     username = update.effective_chat.username
-    logger.info(f'Starting song download. Chat ID: {chat_id}, Message ID: {message_id}, Username: {username}')
+
+    logger.info(
+        f"Starting song download. "
+        f"Chat ID: {chat_id}, "
+        f"Message ID: {message_id}, "
+        f"Username: {username}"
+    )
 
     url = update.effective_message.text.strip()
 
+    # =====================================================
+    # Create temporary directory
+    # =====================================================
+
     download_dir = f".temp{message_id}{chat_id}"
+
     os.makedirs(download_dir, exist_ok=True)
+
+    original_dir = os.getcwd()
+
     os.chdir(download_dir)
 
-    logger.info('Downloading song...')
-    context.bot.send_message(chat_id=chat_id, text="🔍 Downloading")
+    try:
 
-    if url.startswith(("http://", "https://")):
-        os.system(f'spotdl --config --no-cache --client-id "5844159a9506462fa5fd2d190238c37e" --client-secret "7736ac0c637c45f0958cb7cb6976db61" download "{url}" --threads 8 --format mp3 --bitrate 320k --yt-dlp-args \'--js-runtimes deno --force-ipv4\'')
+        logger.info("Downloading song...")
 
-        logger.info('Sending song to user...')
-        sent = 0
-        files = [file for file in os.listdir(".") if file.endswith(".mp3")]
-        if files:
-            for file in files:
-                try:
-                    with open(file, 'rb') as audio_file:
-                        context.bot.send_audio(chat_id=chat_id, audio=audio_file, timeout=18000)
-                    sent += 1
-                    time.sleep(0.3)  # Add a delay of 0.3 second between sending each audio file
-                except Exception as e:
-                    logger.error(f"Error sending audio: {e}")
-            logger.info(f'Sent {sent} audio file(s) to user.')
+        context.bot.send_message(
+            chat_id=chat_id,
+            text="🔍 Downloading"
+        )
+
+        # =================================================
+        # Validate URL
+        # =================================================
+
+        if url.startswith(("http://", "https://")):
+
+            # =================================================
+            # spotDL command
+            # =================================================
+
+            command = (
+                f'{SPOTDL} '
+                f'--config '
+                f'--no-cache '
+                f'--client-id "5844159a9506462fa5fd2d190238c37e" '
+                f'--client-secret "7736ac0c637c45f0958cb7cb6976db61" '
+                f'download "{url}" '
+                f'--threads 8 '
+                f'--format mp3 '
+                f'--bitrate 320k '
+                f'--yt-dlp-args \'--js-runtimes deno --force-ipv4\''
+            )
+
+            logger.info("Running spotDL...")
+
+            result = os.system(command)
+
+            logger.info(
+                f"spotDL process finished with exit code: {result}"
+            )
+
+            # =================================================
+            # Find downloaded MP3 files
+            # =================================================
+
+            logger.info("Sending song to user...")
+
+            sent = 0
+
+            files = [
+                file
+                for file in os.listdir(".")
+                if file.lower().endswith(".mp3")
+            ]
+
+            if files:
+
+                for file in files:
+
+                    try:
+
+                        with open(file, "rb") as audio_file:
+
+                            context.bot.send_audio(
+                                chat_id=chat_id,
+                                audio=audio_file,
+                                timeout=18000
+                            )
+
+                        sent += 1
+
+                        time.sleep(0.3)
+
+                    except Exception as e:
+
+                        logger.error(
+                            f"Error sending audio: {e}"
+                        )
+
+                logger.info(
+                    f"Sent {sent} audio file(s) to user."
+                )
+
+            else:
+
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ Unable to find the requested song."
+                )
+
+                logger.warning(
+                    "No audio file found after download."
+                )
+
         else:
-            context.bot.send_message(chat_id=chat_id, text="❌ Unable to find the requested song.")
-            logger.warning('No audio file found after download.')
-    else:
-        context.bot.send_message(chat_id=chat_id, text="❌ Invalid URL. Please provide a valid song URL.")
-        logger.warning('Invalid URL provided.')
 
-    os.chdir('..')
-    os.system(f'rm -rf {download_dir}')
+            context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ Invalid URL. Please provide a valid song URL."
+            )
+
+            logger.warning(
+                "Invalid URL provided."
+            )
+
+    except Exception as e:
+
+        logger.exception(
+            f"Download error: {e}"
+        )
+
+        try:
+
+            context.bot.send_message(
+                chat_id=chat_id,
+                text=f"❌ Download error: {e}"
+            )
+
+        except Exception:
+            pass
+
+    finally:
+
+        # =================================================
+        # Return to original directory
+        # =================================================
+
+        os.chdir(original_dir)
+
+        # =================================================
+        # Remove temporary directory
+        # =================================================
+
+        os.system(
+            f'rm -rf "{download_dir}"'
+        )
+
+
+# =========================================================
+# Main
+# =========================================================
 
 def main():
-    updater = Updater(token=config.token, use_context=True)
+
+    updater = Updater(
+        token=config.token,
+        use_context=True
+    )
+
     dispatcher = updater.dispatcher
 
+    # =====================================================
     # Handlers
-    start_handler = CommandHandler('start', start)
-    dispatcher.add_handler(start_handler)
+    # =====================================================
 
-    password_handler = MessageHandler(Filters.text & Filters.regex(r'^/password '), authenticate_user)
-    dispatcher.add_handler(password_handler)
+    start_handler = CommandHandler(
+        "start",
+        start
+    )
 
-    song_handler = MessageHandler(Filters.text & (~Filters.command), get_single_song)
-    dispatcher.add_handler(song_handler)
+    dispatcher.add_handler(
+        start_handler
+    )
 
-    # Start the bot
-    updater.start_polling(poll_interval=0.3)
-    logger.info('Bot started')
-    updater.idle()
+    password_handler = MessageHandler(
+        Filters.text & Filters.regex(r'^/password '),
+        authenticate_user
+    )
+
+    dispatcher.add_handler(
+        password_handler
+    )
+
+    song_handler = MessageHandler(
+        Filters.text & (~Filters.command),
+        get_single_song
+    )
+
+    dispatcher.add_handler(
+        song_handler
+    )
+
+    # =====================================================
+    # Start Telegram bot
+    # =====================================================
+
+    updater.start_polling(
+        poll_interval=0.3
+    )
+
+    logger.info("Bot started")
+
+    # =====================================================
+    # IMPORTANT:
+    # Do NOT use updater.idle() inside Streamlit.
+    # It attempts to register OS signals and causes:
+    #
+    # ValueError: signal only works in main thread
+    # =====================================================
+
+    while True:
+        time.sleep(60)
+
+
+# =========================================================
+# Entry point
+# =========================================================
 
 if __name__ == "__main__":
     main()

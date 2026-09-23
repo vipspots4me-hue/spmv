@@ -7,3 +7,5 @@ ytmusicapi
 spotipy
 requests
 pip
+APScheduler==3.6.3
+setuptools==80.10.2

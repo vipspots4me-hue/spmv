@@ -24,7 +24,7 @@ class Config:
                 raise ValueError("Telegram token not found.")
         self.token = token
         self.auth_enabled = False  # Change to True if authentication is required
-        self.auth_password = "PASS"  # Set the desired authentication password
+        self.auth_password = "spot@o"  # Set the desired authentication password
         self.auth_users = []  # List of authorized user chat IDs
 
 config = Config()

@@ -9,4 +9,3 @@ requests
 pip
 APScheduler==3.6.3
 setuptools==80.10.2
-pip3.11 install git+https://github.com/TzurSoffer/spotify-downloader@29cb0b0669d5c107331b0912fdef73967b47493e

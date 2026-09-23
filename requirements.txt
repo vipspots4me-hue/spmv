@@ -1,11 +1,11 @@
-ffmpegio==0.7.0
+streamlit
 python-telegram-bot==13.14
-python-dotenv
-spotdl
-pytube
-ytmusicapi
+spotdl==4.4.11
 spotipy
+yt-dlp==2026.08.19
+ytmusicapi
+pytube
 requests
-pip
+python-dotenv
 APScheduler==3.6.3
 setuptools==80.10.2

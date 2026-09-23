@@ -79,7 +79,7 @@ def get_single_song(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=chat_id, text="🔍 Downloading")
 
     if url.startswith(("http://", "https://")):
-        os.system(f'spotdl --config --no-cache --client-id "5844159a9506462fa5fd2d190238c37e" --client-secret "7736ac0c637c45f0958cb7cb6976db61" download "{url}" --threads 8 --format mp3 --bitrate 320k --yt-dlp-args \'--extractor-args "youtube:player_client=web_embedded"\'')
+        os.system(f'spotdl --config --no-cache --client-id "5844159a9506462fa5fd2d190238c37e" --client-secret "7736ac0c637c45f0958cb7cb6976db61" download "{url}" --threads 8 --format mp3 --bitrate 320k --yt-dlp-args \'--js-runtimes deno --force-ipv4\'')
 
         logger.info('Sending song to user...')
         sent = 0

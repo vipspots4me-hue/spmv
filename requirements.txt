@@ -1,8 +1,8 @@
 streamlit
 python-telegram-bot==13.14
-spotdl==4.4.11
+spotdl
 spotipy
-yt-dlp==2026.08.19
+yt-dlp==2026.06.09
 ytmusicapi
 pytube
 requests
